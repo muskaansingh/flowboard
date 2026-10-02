@@ -1,5 +1,7 @@
 # Flowboard
 
+**Live demo:** https://flowboard-tan-ten.vercel.app
+
 A mini project-management app (think ClickUp / Linear at hobby scale) for a single workspace:
 a **workspace → space → folder → list → task** hierarchy, a **kanban board** and a **list view**,
 a **task drawer**, and a **permission model** you can demo by switching between three mock users.
@@ -290,6 +292,7 @@ popovers); none of that is authored here. Dynamic widths (e.g. the list progress
 
 1. **Client-side search** on task title + description (top bar, `/` to focus) — across every list *you can see*, opens the task in place.
 2. **Activity feed** ("Alice moved *X* to Done") — permission-filtered per viewer, click an entry to jump to the task.
+3. **Deployed preview** on Vercel (auto-deploys on every push to `main`).
 
 Also within MVP-stretch: **one level of subtasks** (drawer checklist, `n/m` badge on cards and rows).
 
