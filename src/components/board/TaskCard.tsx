@@ -2,41 +2,65 @@ import { memo, type KeyboardEvent } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Task, User } from '@/domain/types';
-import { AvatarStack, DueDate, PriorityBadge } from '@/components/ui/primitives';
+import { AvatarStack, DueDate, LabelChip, PointsBadge, PriorityIcon, TaskTypeIcon } from '@/components/ui/primitives';
 import { Subtasks } from '@/ui/icons';
 import { PRIORITY_META, cx } from '@/ui/tokens';
+import { PriorityMenu } from './PriorityMenu';
 
 export interface TaskCardProps {
   task: Task;
+  /** Jira-style key, e.g. SPR-12. */
+  taskKey: string;
   assignees: User[];
   done: boolean;
   subtasks?: { done: number; total: number };
 }
 
-/** Presentational card (also used inside the DragOverlay). */
-export const TaskCardBody = memo(function TaskCardBody({ task, assignees, done, subtasks, lifted }: TaskCardProps & { lifted?: boolean }) {
+const MAX_LABELS = 2;
+
+/**
+ * Presentational card (also used inside the DragOverlay). Jira layout: title, labels, then a
+ * footer with type · key on the left and points · priority · assignees on the right.
+ */
+export const TaskCardBody = memo(function TaskCardBody({ task, taskKey, assignees, done, subtasks, lifted }: TaskCardProps & { lifted?: boolean }) {
   return (
     <div
       className={cx(
-        'group relative rounded-card bg-surface p-3 shadow-card ring-1 ring-line transition-shadow',
+        'group relative rounded-card bg-surface px-3 pb-2.5 pt-3 shadow-card ring-1 ring-line transition-shadow',
         lifted ? 'rotate-[1.5deg] cursor-grabbing shadow-lift ring-brand-300' : 'hover:shadow-card-hover hover:ring-line-strong',
       )}
     >
-      {task.priority === 'urgent' && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r bg-rose-500" aria-hidden />}
-      <p className={cx('text-sm font-medium leading-snug text-ink', done && 'text-ink-muted line-through decoration-ink-subtle/60')}>
-        {task.title}
-      </p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <PriorityBadge priority={task.priority} compact />
-        <DueDate iso={task.dueDate} done={done} />
-        {subtasks && subtasks.total > 0 && (
-          <span className="inline-flex items-center gap-1 text-2xs font-medium text-ink-muted" title="Subtasks done">
-            <Subtasks size={12} />
-            {subtasks.done}/{subtasks.total}
-          </span>
-        )}
-        <span className="ml-auto">
-          <AvatarStack users={assignees} />
+      <p className={cx('line-clamp-3 text-sm leading-snug text-ink', done && 'text-ink-muted')}>{task.title}</p>
+
+      {(task.labels.length > 0 || task.dueDate || (subtasks && subtasks.total > 0)) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {task.labels.slice(0, MAX_LABELS).map((l) => (
+            <LabelChip key={l} label={l} />
+          ))}
+          {task.labels.length > MAX_LABELS && <span className="text-2xs text-ink-subtle">+{task.labels.length - MAX_LABELS}</span>}
+          <DueDate iso={task.dueDate} done={done} />
+          {subtasks && subtasks.total > 0 && (
+            <span className="inline-flex items-center gap-1 text-2xs font-medium text-ink-muted" title="Subtasks done">
+              <Subtasks size={12} />
+              {subtasks.done}/{subtasks.total}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-2.5 flex items-center gap-1.5">
+        <TaskTypeIcon type={task.type} />
+        <span className={cx('text-2xs font-semibold uppercase tracking-wide text-ink-muted', done && 'line-through decoration-ink-subtle/70')}>
+          {taskKey}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5">
+          <PointsBadge points={task.points} />
+          {lifted ? <PriorityIcon priority={task.priority} /> : <PriorityMenu taskId={task.id} priority={task.priority} compact />}
+          {assignees.length > 0 ? (
+            <AvatarStack users={assignees} max={2} />
+          ) : (
+            <span className="h-6 w-6 rounded-full border border-dashed border-line-strong" title="Unassigned" aria-label="Unassigned" />
+          )}
         </span>
       </div>
       <span className="sr-only">Priority: {PRIORITY_META[task.priority].label}</span>
@@ -69,7 +93,7 @@ export function SortableTaskCard({ onOpen, ...props }: TaskCardProps & { onOpen:
       {...listeners}
       onKeyDown={onKeyDown}
       onClick={() => onOpen(props.task.id)}
-      aria-label={`${props.task.title}. Press Enter to open, Space to drag.`}
+      aria-label={`${props.taskKey} ${props.task.title}. Press Enter to open, Space to drag.`}
       data-testid="task-card"
       className={cx(
         'cursor-grab rounded-card outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',

@@ -1,7 +1,15 @@
-import type { EntitiesState, ID, Priority, Status, Task } from '../types';
+import type { EntitiesState, ID, Priority, Status, Task, TaskType } from '../types';
 import { fail, ok, type Result } from '../result';
 import { canSeeContainer, requireTaskEditAccess } from '../permissions';
-import { validateDescription, validateDueDate, validatePriority, validateTitle } from '../validation';
+import {
+  validateDescription,
+  validateDueDate,
+  validateLabels,
+  validatePoints,
+  validatePriority,
+  validateTaskType,
+  validateTitle,
+} from '../validation';
 import { byPosition, insertAt } from '../ordering';
 import { statusesForList } from './statuses';
 import { withActivity, type CommandContext, type CommandResult } from './context';
@@ -85,6 +93,13 @@ function mapStatus(state: EntitiesState, fromStatusId: ID, toListId: ID): Status
   return targetStatuses.find((s) => from && s.category === from.category) ?? targetStatuses[0];
 }
 
+/** Next workspace-wide task number (keys stay unique even when tasks move between lists). */
+export function nextTaskNumber(tasks: Record<ID, Task>): number {
+  let max = 0;
+  for (const t of Object.values(tasks)) if (t.number > max) max = t.number;
+  return max + 1;
+}
+
 /* ------------------------------------------------------------------ commands */
 
 export interface CreateTaskInput {
@@ -95,6 +110,9 @@ export interface CreateTaskInput {
   assigneeIds?: ID[];
   dueDate?: string | null;
   parentTaskId?: ID | null;
+  type?: TaskType;
+  points?: number | null;
+  labels?: string[];
 }
 
 export function createTask(ctx: CommandContext, listId: ID, input: CreateTaskInput): CommandResult<Task> {
@@ -111,6 +129,12 @@ export function createTask(ctx: CommandContext, listId: ID, input: CreateTaskInp
   if (dueDate.error) return dueDate;
   const assignees = validateAssignees(ctx.state, listId, input.assigneeIds);
   if (assignees.error) return assignees;
+  const type = validateTaskType(input.type);
+  if (type.error) return type;
+  const points = validatePoints(input.points);
+  if (points.error) return points;
+  const labels = validateLabels(input.labels);
+  if (labels.error) return labels;
 
   let parent: Task | undefined;
   if (input.parentTaskId) {
@@ -131,6 +155,10 @@ export function createTask(ctx: CommandContext, listId: ID, input: CreateTaskInp
 
   const task: Task = {
     id: ctx.newId('tk'),
+    number: nextTaskNumber(ctx.state.tasks),
+    type: type.data,
+    points: points.data,
+    labels: labels.data,
     title: title.data,
     description: description.data,
     statusId,
@@ -165,6 +193,9 @@ export interface UpdateTaskPatch {
   assigneeIds?: ID[];
   dueDate?: string | null;
   statusId?: ID;
+  type?: TaskType;
+  points?: number | null;
+  labels?: string[];
 }
 
 export function updateTask(
@@ -193,6 +224,9 @@ export function updateTask(
   if (patch.assigneeIds !== undefined) {
     collect(validateAssignees(ctx.state, task.primaryListId, patch.assigneeIds), (v) => (next.assigneeIds = v));
   }
+  if (patch.type !== undefined) collect(validateTaskType(patch.type), (v) => (next.type = v));
+  if (patch.points !== undefined) collect(validatePoints(patch.points), (v) => (next.points = v));
+  if (patch.labels !== undefined) collect(validateLabels(patch.labels), (v) => (next.labels = v));
   if (patch.statusId !== undefined) collect(requireStatusInList(ctx.state, patch.statusId, task.primaryListId), () => {});
   if (Object.keys(fields).length) {
     return fail('VALIDATION', Object.values(fields)[0] ?? 'Please fix the highlighted fields.', fields);
@@ -327,10 +361,13 @@ export function deleteTask(ctx: CommandContext, id: ID): CommandResult<{ deleted
   if (task.parentTaskId) renumber(tasks, subtasksOf(tasks, task.parentTaskId), ctx.now);
   else renumber(tasks, columnTasks(tasks, task.primaryListId, task.statusId), ctx.now);
 
+  const comments = Object.fromEntries(Object.entries(ctx.state.comments).filter(([, c]) => !deleted.includes(c.taskId)));
+
   return ok({
     value: { deleted },
     patch: {
       tasks,
+      comments,
       activity: withActivity(ctx, { resourceId: task.primaryListId, taskId: null, message: `deleted “${task.title}”` }),
     },
   });

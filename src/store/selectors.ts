@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Container, EntitiesState, ID, Status, Task, User } from '@/domain/types';
+import type { ActivityEntry, Comment, Container, EntitiesState, ID, Status, Task, User } from '@/domain/types';
 import { fail, ok, type Result } from '@/domain/result';
 import { canSeeContainer, isAdmin, isEffectivelyArchived, requireContainer, usersWithAccess } from '@/domain/permissions';
 import { buildVisibleTree, pathTo, visibleListIds, type TreeNode } from '@/domain/tree';
 import { columnTasks, subtasksOf } from '@/domain/commands/tasks';
 import { statusesForList } from '@/domain/commands/statuses';
+import { toPlainText } from '@/domain/richText';
+import { taskKey } from '@/domain/taskKey';
 import { useAppStore, type AppState } from './appStore';
 
 /**
@@ -71,6 +73,13 @@ export interface TaskDetailModel {
   assignable: User[];
   /** Lists the user can move this task to. */
   moveTargets: Container[];
+  /** Jira-style key, e.g. SPR-12. */
+  key: string;
+  comments: Comment[];
+  /** Activity entries about this task (and its subtasks), newest first. */
+  history: ActivityEntry[];
+  /** Labels used anywhere in this list — suggestions for the label picker. */
+  knownLabels: string[];
 }
 
 export function selectTaskDetail(s: ReadState, taskId: ID): Result<TaskDetailModel> {
@@ -89,6 +98,14 @@ export function selectTaskDetail(s: ReadState, taskId: ID): Result<TaskDetailMod
     parent: task.parentTaskId ? (s.tasks[task.parentTaskId] ?? null) : null,
     assignable: usersWithAccess(s, task.primaryListId),
     moveTargets: [...visible].map((id) => s.containers[id]!).sort((a, b) => a.name.localeCompare(b.name)),
+    key: taskKey(task, s.containers),
+    comments: Object.values(s.comments)
+      .filter((c) => c.taskId === task.id)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    history: s.activity.filter((a) => a.taskId === task.id),
+    knownLabels: [
+      ...new Set(Object.values(s.tasks).filter((t) => t.primaryListId === task.primaryListId).flatMap((t) => t.labels)),
+    ].sort(),
   });
 }
 
@@ -98,7 +115,7 @@ export interface SearchHit {
   status: Status | undefined;
 }
 
-/** Client-side search across title + description of every task the user can see. */
+/** Client-side search across key, title + description of every task the user can see. */
 export function selectSearch(s: ReadState, query: string, limit = 20): SearchHit[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -106,11 +123,17 @@ export function selectSearch(s: ReadState, query: string, limit = 20): SearchHit
   const hits: SearchHit[] = [];
   for (const t of Object.values(s.tasks)) {
     if (!visible.has(t.primaryListId)) continue;
-    if (!t.title.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) continue;
+    const key = taskKey(t, s.containers).toLowerCase();
+    if (!key.startsWith(q) && !t.title.toLowerCase().includes(q) && !toPlainText(t.description).toLowerCase().includes(q)) continue;
     hits.push({ task: t, list: s.containers[t.primaryListId]!, status: s.statuses[t.statusId] });
   }
   return hits
-    .sort((a, b) => Number(b.task.title.toLowerCase().startsWith(q)) - Number(a.task.title.toLowerCase().startsWith(q)))
+    // Exact key match first (typing "SPR-9" jumps straight to it), then title-prefix matches.
+    .sort(
+      (a, b) =>
+        Number(taskKey(b.task, s.containers).toLowerCase() === q) - Number(taskKey(a.task, s.containers).toLowerCase() === q) ||
+        Number(b.task.title.toLowerCase().startsWith(q)) - Number(a.task.title.toLowerCase().startsWith(q)),
+    )
     .slice(0, limit);
 }
 
@@ -139,6 +162,7 @@ export function useReadState(): ReadState {
       users: s.users,
       grants: s.grants,
       activity: s.activity,
+      comments: s.comments,
       currentUserId: s.currentUserId,
       workspaceId: s.workspaceId,
     })),

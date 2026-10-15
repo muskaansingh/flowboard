@@ -20,12 +20,17 @@ export function SelectMenu<T extends string>({
   placeholder = 'Select…',
   renderValue,
   disabled,
+  size = 'md',
+  variant = 'outline',
 }: {
   label: string;
   options: SelectOption<T>[];
   placeholder?: string;
   renderValue?: (selected: SelectOption<T>[]) => ReactNode;
   disabled?: boolean;
+  size?: 'sm' | 'md';
+  /** `ghost` reads as plain text until hovered — for Jira-style detail fields. */
+  variant?: 'outline' | 'ghost';
 } & ({ multiple: true; value: T[]; onChange: (v: T[]) => void } | { multiple?: false; value: T; onChange: (v: T) => void })) {
   const selected = options.filter((o) => (multiple ? (value as T[]).includes(o.value) : o.value === value));
   return (
@@ -33,7 +38,9 @@ export function SelectMenu<T extends string>({
       <ListboxButton
         aria-label={label}
         className={cx(
-          'flex min-h-[2.25rem] w-full items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5 text-left text-sm text-ink ring-1 ring-inset ring-line-strong transition-colors hover:bg-canvas data-[open]:ring-2 data-[open]:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60',
+          'group flex w-full items-center gap-2 rounded-lg px-2.5 text-left text-ink ring-inset transition-colors hover:bg-canvas data-[open]:ring-2 data-[open]:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60',
+          variant === 'ghost' ? 'bg-transparent data-[open]:bg-surface' : 'bg-surface ring-1 ring-line-strong',
+          size === 'sm' ? 'min-h-8 py-1 text-xs' : 'min-h-[2.25rem] py-1.5 text-sm',
           focusRing,
         )}
       >
@@ -51,11 +58,14 @@ export function SelectMenu<T extends string>({
             ))
           )}
         </span>
-        <ChevronDown size={14} className="shrink-0 text-ink-subtle" />
+        <ChevronDown
+          size={14}
+          className={cx('shrink-0 text-ink-subtle', variant === 'ghost' && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-data-[open]:opacity-100')}
+        />
       </ListboxButton>
       <ListboxOptions
         anchor="bottom start"
-        className="z-[70] max-h-64 w-[var(--button-width)] overflow-y-auto rounded-card bg-surface p-1 shadow-pop ring-1 ring-black/5 focus:outline-none [--anchor-gap:4px]"
+        className="z-[70] max-h-64 w-[var(--button-width)] min-w-48 overflow-y-auto rounded-card bg-surface p-1 shadow-pop ring-1 ring-black/5 focus:outline-none [--anchor-gap:4px]"
       >
         {options.map((o) => (
           <ListboxOption

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { PRIORITIES, type ID, type Priority } from '@/domain/types';
+import { PRIORITIES, TASK_TYPES, type ID, type Priority, type TaskType } from '@/domain/types';
 import { useAppStore } from '@/store/appStore';
 import { toast } from '@/store/toastStore';
 import { useUiStore } from '@/store/uiStore';
@@ -7,9 +7,9 @@ import type { ListViewModel } from '@/store/selectors';
 import { usersWithAccess } from '@/domain/permissions';
 import { Modal } from '@/components/ui/overlays';
 import { SelectMenu } from '@/components/ui/SelectMenu';
-import { Avatar, Button, FieldError, StatusDot, inputClass, labelClass } from '@/components/ui/primitives';
+import { Avatar, Button, FieldError, StatusDot, TaskTypeIcon, inputClass, labelClass } from '@/components/ui/primitives';
 import { Flag } from '@/ui/icons';
-import { PRIORITY_META } from '@/ui/tokens';
+import { PRIORITY_META, TYPE_META } from '@/ui/tokens';
 
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
@@ -20,6 +20,7 @@ export function NewTaskDialog({ vm, open, onClose }: { vm: ListViewModel; open: 
   const [title, setTitle] = useState('');
   const [statusId, setStatusId] = useState<ID>(defaultStatus);
   const [priority, setPriority] = useState<Priority>('none');
+  const [type, setType] = useState<TaskType>('task');
   const [assigneeIds, setAssigneeIds] = useState<ID[]>([]);
   const [due, setDue] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -29,6 +30,7 @@ export function NewTaskDialog({ vm, open, onClose }: { vm: ListViewModel; open: 
     setTitle('');
     setStatusId(defaultStatus);
     setPriority('none');
+    setType('task');
     setAssigneeIds([]);
     setDue('');
     setErrors({});
@@ -40,6 +42,7 @@ export function NewTaskDialog({ vm, open, onClose }: { vm: ListViewModel; open: 
       title,
       statusId,
       priority,
+      type,
       assigneeIds,
       dueDate: fromLocalInput(due),
     });
@@ -75,6 +78,16 @@ export function NewTaskDialog({ vm, open, onClose }: { vm: ListViewModel; open: 
           <FieldError message={errors.title} />
         </div>
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 sm:col-span-1">
+            <span className={labelClass}>Type</span>
+            <SelectMenu<TaskType>
+              label="Type"
+              value={type}
+              options={TASK_TYPES.map((t) => ({ value: t, label: TYPE_META[t].label, icon: <TaskTypeIcon type={t} /> }))}
+              onChange={setType}
+            />
+          </div>
+          <div className="hidden sm:block" aria-hidden />
           <div>
             <span className={labelClass}>Status</span>
             <SelectMenu

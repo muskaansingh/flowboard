@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { Container, EntitiesState, Grant, GrantMode, ID, Status, Task, User, Visibility } from '@/domain/types';
+import type { Comment, Container, EntitiesState, Grant, GrantMode, ID, Status, Task, User, Visibility } from '@/domain/types';
 import { fail, ok, type Result } from '@/domain/result';
 import { createSeed, IDS } from '@/data/seed';
 import { defaultIdFactory, type CommandContext, type CommandResult } from '@/domain/commands/context';
@@ -8,6 +8,7 @@ import * as containers from '@/domain/commands/containers';
 import * as tasks from '@/domain/commands/tasks';
 import * as statuses from '@/domain/commands/statuses';
 import * as grants from '@/domain/commands/grants';
+import * as comments from '@/domain/commands/comments';
 
 /**
  * The single client data layer (stands in for API + DB).
@@ -51,6 +52,23 @@ export interface AppState extends EntitiesState {
   ) => Result<Task>;
   moveTask: (id: ID, input: tasks.MoveTaskInput) => Result<tasks.MoveTaskOutput>;
   deleteTask: (id: ID) => Result<{ deleted: ID[] }>;
+
+  addComment: (taskId: ID, body: string) => Result<Comment>;
+  editComment: (id: ID, body: string) => Result<Comment>;
+  deleteComment: (id: ID) => Result<{ deleted: ID }>;
+
+  /** Snapshot of the task-related slices, taken right before an undoable action. */
+  snapshot: () => UndoSnapshot;
+  /**
+   * Restores a snapshot — but only if nothing else touched tasks since `after` was current,
+   * so undo can never silently clobber a later change.
+   */
+  undo: (snap: UndoSnapshot, after: Record<ID, Task>) => Result<true>;
+}
+
+export interface UndoSnapshot {
+  tasks: Record<ID, Task>;
+  comments: Record<ID, Comment>;
 }
 
 export interface CreateStoreOptions {
@@ -63,7 +81,18 @@ export interface CreateStoreOptions {
 }
 
 export const STORAGE_KEY = 'flowboard:v1';
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
+
+/** v1 → v2: tasks gain number/type/points/labels; comments slice added. Keeps the user's data. */
+export function migrateV1(persisted: Record<string, unknown>): Record<string, unknown> {
+  const oldTasks = (persisted.tasks ?? {}) as Record<ID, Partial<Task> & Task>;
+  const ordered = Object.values(oldTasks).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  const tasks: Record<ID, Task> = {};
+  ordered.forEach((t, i) => {
+    tasks[t.id] = { ...t, number: t.number ?? i + 1, type: t.type ?? 'task', points: t.points ?? null, labels: t.labels ?? [] };
+  });
+  return { ...persisted, tasks, comments: persisted.comments ?? {} };
+}
 
 export const entitiesOf = (s: EntitiesState): EntitiesState => ({
   containers: s.containers,
@@ -72,6 +101,7 @@ export const entitiesOf = (s: EntitiesState): EntitiesState => ({
   users: s.users,
   grants: s.grants,
   activity: s.activity,
+  comments: s.comments,
 });
 
 const sleep = (ms: number) => (ms > 0 ? new Promise<void>((r) => setTimeout(r, ms)) : Promise.resolve());
@@ -132,6 +162,17 @@ export function createAppStore(options: CreateStoreOptions = {}) {
       updateTask: (id, patch, opts) => run((ctx) => tasks.updateTask(ctx, id, patch, opts)),
       moveTask: (id, input) => run((ctx) => tasks.moveTask(ctx, id, input)),
       deleteTask: (id) => run((ctx) => tasks.deleteTask(ctx, id)),
+
+      addComment: (taskId, body) => run((ctx) => comments.addComment(ctx, taskId, body)),
+      editComment: (id, body) => run((ctx) => comments.editComment(ctx, id, body)),
+      deleteComment: (id) => run((ctx) => comments.deleteComment(ctx, id)),
+
+      snapshot: () => ({ tasks: get().tasks, comments: get().comments }),
+      undo: (snap, after) => {
+        if (get().tasks !== after) return fail('CONFLICT', 'Can’t undo — this list changed since.');
+        set({ tasks: snap.tasks, comments: snap.comments });
+        return ok(true);
+      },
     };
   };
 
@@ -145,8 +186,11 @@ export function createAppStore(options: CreateStoreOptions = {}) {
       version: STORAGE_VERSION,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ ...entitiesOf(s), currentUserId: s.currentUserId }),
-      // Unknown / older shapes fall back to fresh seed data rather than crashing.
-      migrate: () => ({ ...seed(), currentUserId: IDS.alice }) as unknown as AppState,
+      // v1 data is upgraded in place; unknown / older shapes fall back to fresh seed data rather than crashing.
+      migrate: (persisted, version) =>
+        (version === 1 && persisted && typeof persisted === 'object'
+          ? migrateV1(persisted as Record<string, unknown>)
+          : { ...seed(), currentUserId: IDS.alice }) as unknown as AppState,
     }),
   );
 }

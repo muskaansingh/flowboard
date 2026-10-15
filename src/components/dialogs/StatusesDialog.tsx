@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/appStore';
 import { notify } from '@/store/toastStore';
 import { statusesForList } from '@/domain/commands/statuses';
 import { Modal } from '@/components/ui/overlays';
-import { Button, IconButton, inputBase } from '@/components/ui/primitives';
+import { Button, IconButton, inputBase, Select } from '@/components/ui/primitives';
 import { ArrowDown, ArrowUp, Plus, Trash } from '@/ui/icons';
 import { CATEGORY_LABEL, STATUS_STYLES, cx } from '@/ui/tokens';
 import { useDialogStore } from './dialogStore';
@@ -64,9 +64,9 @@ function StatusRow({ status, index, count, siblings }: { status: Status; index: 
           onBlur={commitName}
           onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
         />
-        <select
+        <Select
           aria-label="Category"
-          className={cx(inputBase, 'h-8 w-32 shrink-0 py-1 text-xs shadow-none')}
+          className="h-8 w-32 shrink-0 py-1 text-xs shadow-none"
           value={status.category}
           onChange={(e) => notify(store().updateStatus(status.id, { category: e.target.value as StatusCategory }))}
         >
@@ -75,7 +75,7 @@ function StatusRow({ status, index, count, siblings }: { status: Status; index: 
               {CATEGORY_LABEL[c]}
             </option>
           ))}
-        </select>
+        </Select>
         <span className="w-14 text-right text-2xs text-ink-subtle">{taskCount} task{taskCount === 1 ? '' : 's'}</span>
         <IconButton label="Move up" disabled={index === 0} onClick={() => notify(store().reorderStatus(status.id, index - 1))} className="disabled:opacity-30">
           <ArrowUp size={14} />
@@ -94,7 +94,7 @@ function StatusRow({ status, index, count, siblings }: { status: Status; index: 
         <div className="mt-2 flex items-center gap-2 rounded-lg bg-rose-50 p-2 pl-3 text-xs text-rose-800">
           {taskCount > 0 ? <span>Delete and move {taskCount} task(s) to</span> : <span className="flex-1">Delete this status?</span>}
           {taskCount > 0 && (
-          <select aria-label="Move tasks to" className={cx(inputBase, 'h-8 w-36 py-1 text-xs')} value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
+          <Select aria-label="Move tasks to" className="h-8 w-36 py-1 text-xs" value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
             {siblings
               .filter((s) => s.id !== status.id)
               .map((s) => (
@@ -102,7 +102,7 @@ function StatusRow({ status, index, count, siblings }: { status: Status; index: 
                   {s.name}
                 </option>
               ))}
-          </select>
+          </Select>
           )}
           <Button size="sm" variant="danger" onClick={confirmDelete}>
             Delete
@@ -154,9 +154,9 @@ export function StatusesDialog() {
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
-        <select
+        <Select
           aria-label="New status category"
-          className={cx(inputBase, 'h-9 w-32 shrink-0 text-xs')}
+          className="h-9 w-32 shrink-0 text-xs"
           value={draft.category}
           onChange={(e) => setDraft({ ...draft, category: e.target.value as StatusCategory })}
         >
@@ -165,7 +165,7 @@ export function StatusesDialog() {
               {CATEGORY_LABEL[c]}
             </option>
           ))}
-        </select>
+        </Select>
         <ColorPicker label="New status colour" value={draft.color} onChange={(color) => setDraft({ ...draft, color })} />
         <Button type="submit" variant="primary" icon={<Plus />} disabled={!draft.name.trim()}>
           Add

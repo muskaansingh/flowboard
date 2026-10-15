@@ -19,7 +19,9 @@ import { useIsAdmin, useSelector, selectVisibleTree } from '@/store/selectors';
 import type { TreeNode } from '@/domain/tree';
 import { useDialogStore } from '@/components/dialogs/dialogStore';
 import { IconButton, Skeleton } from '@/components/ui/primitives';
-import { Plus } from '@/ui/icons';
+import { PanelLeft, Plus } from '@/ui/icons';
+import { cx } from '@/ui/tokens';
+import { useUiStore } from '@/store/uiStore';
 import { TreeItem, TreeItemPreview } from './TreeItem';
 import { ArchivedSection } from './ArchivedSection';
 
@@ -92,6 +94,10 @@ export function Sidebar() {
   const containers = useAppStore((s) => s.containers);
   const isAdmin = useIsAdmin();
   const openDialog = useDialogStore((s) => s.open);
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
+  const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
   const [collapsed, setCollapsed] = useState<Set<ID>>(new Set());
   const [active, setActive] = useState<Container | null>(null);
@@ -127,17 +133,32 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col bg-sidebar text-ink-inverse" aria-label="Workspace navigation">
+    <>
+    {mobileNavOpen && (
+      <div className="fixed inset-0 z-30 bg-ink/30 animate-fade-in lg:hidden" aria-hidden onClick={() => setMobileNavOpen(false)} />
+    )}
+    <aside
+      className={cx(
+        'fixed inset-y-0 left-0 z-40 flex h-full w-64 shrink-0 flex-col bg-sidebar text-ink-inverse shadow-lift transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 lg:shadow-none',
+        mobileNavOpen ? 'translate-x-0' : '-translate-x-full',
+        sidebarCollapsed && 'lg:hidden',
+      )}
+      aria-label="Workspace navigation"
+      onKeyDown={(e) => e.key === 'Escape' && mobileNavOpen && setMobileNavOpen(false)}
+    >
       <div className="flex h-14 items-center gap-2.5 border-b border-white/5 px-4">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white shadow-card">F</span>
-        <div className="min-w-0">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-700 text-xs font-bold text-white shadow-card ring-1 ring-white/10">F</span>
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-tight">Flowboard</p>
           <p className="truncate text-2xs leading-tight text-ink-inverse/50">{containers[workspaceId]?.name}</p>
         </div>
+        <IconButton tone="dark" label="Collapse sidebar ( [ )" onClick={toggleSidebar}>
+          <PanelLeft size={15} />
+        </IconButton>
       </div>
 
       <div className="flex items-center justify-between px-4 pb-1 pt-4">
-        <span className="text-2xs font-semibold uppercase tracking-wider text-ink-inverse/40">Spaces</span>
+        <span className="text-2xs font-semibold uppercase tracking-wider text-ink-inverse/45">Spaces</span>
         {isAdmin && (
           <IconButton tone="dark" label="New space" onClick={() => openDialog({ kind: 'create', parentId: workspaceId })}>
             <Plus size={14} />
@@ -178,5 +199,6 @@ export function Sidebar() {
 
       {isAdmin && <ArchivedSection />}
     </aside>
+    </>
   );
 }

@@ -1,7 +1,7 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import type { Priority, Status, User } from '@/domain/types';
-import { AVATAR_STYLES, PRIORITY_META, STATUS_STYLES, cx, focusRing, initials } from '@/ui/tokens';
-import { Calendar, Flag } from '@/ui/icons';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import type { Priority, Status, TaskType, User } from '@/domain/types';
+import { AVATAR_STYLES, PRIORITY_META, STATUS_STYLES, TYPE_META, cx, focusRing, initials } from '@/ui/tokens';
+import { Bookmark, Bug, Calendar, Check, ChevronDown, Flag } from '@/ui/icons';
 
 /* ------------------------------------------------------------------ Button */
 
@@ -93,7 +93,7 @@ export function AvatarStack({ users, max = 3, size = 'sm' }: { users: User[]; ma
   const shown = users.slice(0, max);
   const extra = users.length - shown.length;
   return (
-    <span className="flex -space-x-1.5" aria-label={`Assignees: ${users.map((u) => u.name).join(', ')}`}>
+    <span className="flex -space-x-1" aria-label={`Assignees: ${users.map((u) => u.name).join(', ')}`}>
       {shown.map((u) => (
         <Avatar key={u.id} user={u} size={size} ring />
       ))}
@@ -107,6 +107,55 @@ export function AvatarStack({ users, max = 3, size = 'sm' }: { users: User[]; ma
 }
 
 /* ------------------------------------------------------------------ Badges */
+
+/** Jira-style issue-type tile (blue check = Task, green bookmark = Story, red bug = Bug). */
+export function TaskTypeIcon({ type, size = 'sm' }: { type: TaskType; size?: 'sm' | 'md' }) {
+  const meta = TYPE_META[type];
+  const Glyph = type === 'story' ? Bookmark : type === 'bug' ? Bug : Check;
+  return (
+    <span
+      title={meta.label}
+      aria-label={meta.label}
+      role="img"
+      className={cx('inline-flex shrink-0 items-center justify-center rounded-[3px] text-white', meta.tile, size === 'md' ? 'h-5 w-5' : 'h-4 w-4')}
+    >
+      <Glyph size={size === 'md' ? 13 : 11} strokeWidth={2.6} />
+    </span>
+  );
+}
+
+/** Priority as a single coloured icon (Jira cards show the icon, not the word). */
+export function PriorityIcon({ priority }: { priority: Priority }) {
+  const meta = PRIORITY_META[priority];
+  return (
+    <span title={`${meta.label} priority`} className="inline-flex">
+      <Flag size={13} className={meta.icon} aria-hidden />
+      <span className="sr-only">{meta.label} priority</span>
+    </span>
+  );
+}
+
+export function PointsBadge({ points }: { points: number | null }) {
+  if (points === null) return null;
+  return (
+    <span title={`${points} story point${points === 1 ? '' : 's'}`} className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-black/[0.06] px-1.5 text-2xs font-semibold tabular-nums text-ink-muted">
+      {points}
+    </span>
+  );
+}
+
+export function LabelChip({ label, onRemove }: { label: string; onRemove?: () => void }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded bg-brand-50 px-1.5 py-px text-2xs font-medium text-brand-800 ring-1 ring-inset ring-brand-100">
+      <span className="truncate">{label}</span>
+      {onRemove && (
+        <button type="button" aria-label={`Remove label ${label}`} onClick={onRemove} className="-mr-0.5 rounded text-brand-700/70 hover:text-brand-900">
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
 
 export function PriorityBadge({ priority, compact = false }: { priority: Priority; compact?: boolean }) {
   if (priority === 'none' && compact) return null;
@@ -169,6 +218,16 @@ export function DueDate({ iso, done }: { iso: string | null; done?: boolean }) {
   );
 }
 
+/** "just now", "5m ago", "3h ago", "2d ago", else a short date. */
+export function timeAgo(iso: string, now = new Date()): string {
+  const secs = Math.round((now.getTime() - new Date(iso).getTime()) / 1000);
+  if (secs < 45) return 'just now';
+  if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
+  if (secs < 86_400) return `${Math.round(secs / 3600)}h ago`;
+  if (secs < 7 * 86_400) return `${Math.round(secs / 86_400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 /* ------------------------------------------------------------------ Feedback */
 
 export function Skeleton({ className }: { className?: string }) {
@@ -212,6 +271,18 @@ export const inputBase = cx(
 );
 
 export const inputClass = cx(inputBase, 'w-full');
+
+/** Native select with the browser arrow replaced by an inset chevron. `className` styles the select itself. */
+export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="relative inline-flex shrink-0">
+      <select {...props} className={cx(inputBase, 'cursor-pointer appearance-none pr-8', className)}>
+        {children}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-subtle" />
+    </span>
+  );
+}
 
 export const labelClass = 'mb-1.5 block text-xs font-medium text-ink-muted';
 

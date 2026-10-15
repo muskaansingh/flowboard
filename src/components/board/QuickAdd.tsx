@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState, type FormEvent } from 'react';
 import type { ID } from '@/domain/types';
 import { useAppStore } from '@/store/appStore';
 import { toast } from '@/store/toastStore';
@@ -6,9 +6,26 @@ import { Button, FieldError } from '@/components/ui/primitives';
 import { Plus } from '@/ui/icons';
 import { cx } from '@/ui/tokens';
 
+export interface QuickAddHandle {
+  open: () => void;
+}
+
 /** Inline "add task" at the bottom of a kanban column. Enter creates, Escape cancels. */
-export function QuickAdd({ listId, statusId, statusName }: { listId: ID; statusId: ID; statusName: string }) {
+export const QuickAdd = forwardRef<QuickAddHandle, { listId: ID; statusId: ID; statusName: string }>(function QuickAdd(
+  { listId, statusId, statusName },
+  ref,
+) {
   const [open, setOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  useImperativeHandle(ref, () => ({
+    open: () => {
+      setOpen(true);
+      requestAnimationFrame(() => {
+        formRef.current?.scrollIntoView({ block: 'nearest' });
+        formRef.current?.querySelector('textarea')?.focus();
+      });
+    },
+  }));
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string>();
 
@@ -37,12 +54,23 @@ export function QuickAdd({ listId, statusId, statusName }: { listId: ID; statusI
   }
 
   return (
-    <form onSubmit={submit} className="rounded-card bg-surface p-2 shadow-card ring-1 ring-brand-300">
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      onBlur={(e) => {
+        // Clicking away from an empty draft closes it; a typed title is kept until Cancel.
+        if (!title.trim() && !e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false);
+          setError(undefined);
+        }
+      }}
+      className="rounded-card bg-surface p-2 shadow-card ring-1 ring-brand-300"
+    >
       <textarea
         autoFocus
         rows={2}
         aria-label={`New task title in ${statusName}`}
-        placeholder="Task title…"
+        placeholder="Task title… (Enter to add, Esc to cancel)"
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
@@ -75,4 +103,4 @@ export function QuickAdd({ listId, statusId, statusName }: { listId: ID; statusI
       </div>
     </form>
   );
-}
+});

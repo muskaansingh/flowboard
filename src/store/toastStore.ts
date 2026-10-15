@@ -7,6 +7,8 @@ export interface Toast {
   kind: ToastKind;
   title: string;
   message?: string;
+  /** Optional inline action, e.g. Undo. Clicking it runs `run` and dismisses the toast. */
+  action?: { label: string; run: () => void };
 }
 
 interface ToastState {
@@ -38,6 +40,9 @@ const ERROR_TITLES: Record<AppError['code'], string> = {
 
 export const toast = {
   success: (title: string, message?: string) => useToastStore.getState().push({ kind: 'success', title, message }),
+  /** Success toast with an Undo button; stays up a little longer so there's time to click it. */
+  undoable: (title: string, undo: () => void, message?: string) =>
+    useToastStore.getState().push({ kind: 'success', title, message, action: { label: 'Undo', run: undo } }, 6000),
   info: (title: string, message?: string) => useToastStore.getState().push({ kind: 'info', title, message }),
   error: (err: AppError) => useToastStore.getState().push({ kind: 'error', title: ERROR_TITLES[err.code], message: err.message }),
 };

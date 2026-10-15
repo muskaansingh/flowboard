@@ -1,4 +1,4 @@
-import type { Container, EntitiesState, Grant, Priority, Status, StatusCategory, StatusColor, Task, User } from '@/domain/types';
+import type { Comment, Container, EntitiesState, Grant, Priority, Status, StatusCategory, StatusColor, Task, TaskType, User } from '@/domain/types';
 
 /**
  * Seed fixtures: 1 workspace, 2 spaces, 2 folders, 3 lists, 20 tasks (incl. subtasks), 3 users, 3 grants.
@@ -120,6 +120,28 @@ export function createSeed(now: Date = new Date()): EntitiesState {
     ],
   };
 
+  // Jira-style metadata by title: [type, story points, labels].
+  const meta: Record<string, [TaskType, number | null, string[]]> = {
+    'Design onboarding checklist': ['story', 5, ['onboarding', 'ux']],
+    'Audit bundle size of the dashboard': ['task', 3, ['performance']],
+    'Add SSO via Google Workspace': ['story', 8, ['auth']],
+    'Migrate settings page to new form components': ['task', 5, ['tech-debt']],
+    'Rate-limit public search endpoint': ['bug', 3, ['security', 'api']],
+    'Write ADR for event bus': ['task', 2, ['architecture']],
+    'Upgrade to React 18 concurrent rendering': ['task', 5, ['tech-debt', 'performance']],
+    'Fix flaky checkout E2E test': ['bug', 2, ['testing']],
+    'Kanban drag-and-drop polish': ['story', 5, ['board', 'a11y']],
+    'Permission-aware sidebar tree': ['story', 8, ['permissions']],
+    'Task detail drawer': ['story', 3, ['ux']],
+    'Waiting on design tokens from brand team': ['task', 1, ['design']],
+    'Seed fixtures for demo workspace': ['task', 1, []],
+    'Launch blog post': ['story', 3, ['content']],
+    'Product Hunt listing': ['task', 2, ['launch']],
+    'Customer quote collection': ['task', null, ['content']],
+    'Newsletter announcement': ['task', 2, ['email', 'launch']],
+    'Teaser video': ['bug', 5, ['video']],
+  };
+
   const tasks: Task[] = [];
   let n = 1;
   for (const [listId, defs] of Object.entries(taskDefs)) {
@@ -127,8 +149,13 @@ export function createSeed(now: Date = new Date()): EntitiesState {
     for (const [title, statusIdx, priority, assigneeIds, due, description] of defs) {
       const position = colCount.get(statusIdx) ?? 0;
       colCount.set(statusIdx, position + 1);
+      const [type, points, labels] = meta[title] ?? ['task', null, []];
       tasks.push({
-        id: `tk_${n++}`,
+        id: `tk_${n}`,
+        number: n++,
+        type,
+        points,
+        labels,
         title,
         description: description ?? '',
         statusId: st(listId, statusIdx),
@@ -147,7 +174,11 @@ export function createSeed(now: Date = new Date()): EntitiesState {
 
   // Subtasks (one level deep) on "Launch blog post" (tk_14) and "Kanban drag-and-drop polish" (tk_9).
   const sub = (parentId: string, listId: string, title: string, statusIdx: number, position: number): Task => ({
-    id: `tk_${n++}`,
+    id: `tk_${n}`,
+    number: n++,
+    type: 'task',
+    points: null,
+    labels: [],
     title,
     description: '',
     statusId: st(listId, statusIdx),
@@ -167,6 +198,13 @@ export function createSeed(now: Date = new Date()): EntitiesState {
     sub('tk_9', IDS.listSprint, 'Drop-target highlight', 3, 0),
   );
 
+  const ago = (hours: number) => new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const comments: Comment[] = [
+    { id: 'cm_1', taskId: 'tk_9', authorId: IDS.alice, body: '@Bob Martins can we also cover auto-scroll when dragging near the board edge?', createdAt: ago(26), editedAt: null },
+    { id: 'cm_2', taskId: 'tk_9', authorId: IDS.bob, body: 'Yes — dnd-kit handles it, I just need to tune the threshold. Will push today.', createdAt: ago(25), editedAt: null },
+    { id: 'cm_3', taskId: 'tk_5', authorId: IDS.bob, body: 'Seeing ~4k req/min from two IPs. Proposing 30 req/min per IP with a burst of 10.', createdAt: ago(5), editedAt: null },
+  ];
+
   const byId = <X extends { id: string }>(xs: X[]) => Object.fromEntries(xs.map((x) => [x.id, x])) as Record<string, X>;
   return {
     users: byId(users),
@@ -175,5 +213,6 @@ export function createSeed(now: Date = new Date()): EntitiesState {
     statuses: byId(statuses),
     tasks: byId(tasks),
     activity: [],
+    comments: byId(comments),
   };
 }

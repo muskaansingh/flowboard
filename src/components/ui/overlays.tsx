@@ -125,6 +125,18 @@ export function Toaster() {
             <p className="text-sm font-semibold text-ink">{t.title}</p>
             {t.message && <p className="mt-0.5 text-xs text-ink-muted">{t.message}</p>}
           </div>
+          {t.action && (
+            <button
+              type="button"
+              onClick={() => {
+                dismiss(t.id);
+                t.action!.run();
+              }}
+              className="-my-1 self-center rounded-md px-2 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              {t.action.label}
+            </button>
+          )}
           <IconButton label="Dismiss notification" onClick={() => dismiss(t.id)} className="-mr-1 -mt-1">
             <X size={14} />
           </IconButton>

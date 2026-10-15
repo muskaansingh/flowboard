@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/appStore';
 import { notify } from '@/store/toastStore';
 import { canSeeContainer, findGrant } from '@/domain/permissions';
 import { Modal } from '@/components/ui/overlays';
-import { Avatar, Button, inputBase } from '@/components/ui/primitives';
+import { Avatar, Button, Select } from '@/components/ui/primitives';
 import { Lock, Users } from '@/ui/icons';
 import { cx } from '@/ui/tokens';
 import { useDialogStore } from './dialogStore';
@@ -79,16 +79,16 @@ export function SharingDialog() {
                   {u.role === 'admin' ? (
                     <span className="w-28 text-right text-2xs text-ink-subtle">Always has access</span>
                   ) : (
-                    <select
+                    <Select
                       aria-label={`Access for ${u.name}`}
-                      className={cx(inputBase, 'w-28 shrink-0 py-1.5 text-xs')}
+                      className="w-28 shrink-0 py-1.5 text-xs"
                       value={grant?.mode ?? ''}
                       onChange={(e) => notify(state.setGrant(node.id, u.id, (e.target.value || null) as GrantMode | null))}
                     >
                       <option value="">Default</option>
                       <option value="allow">Allow</option>
                       <option value="deny">Deny</option>
-                    </select>
+                    </Select>
                   )}
                 </li>
               );

@@ -10,6 +10,7 @@ import { ContainerDialog } from '@/components/dialogs/ContainerDialog';
 import { SharingDialog } from '@/components/dialogs/SharingDialog';
 import { StatusesDialog } from '@/components/dialogs/StatusesDialog';
 import { ConfirmHost, Toaster } from '@/components/ui/overlays';
+import { CommandPalette } from '@/components/layout/CommandPalette';
 
 export default function App() {
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function App() {
       <ContainerDialog />
       <SharingDialog />
       <StatusesDialog />
+      <CommandPalette />
       <ConfirmHost />
       <Toaster />
     </div>

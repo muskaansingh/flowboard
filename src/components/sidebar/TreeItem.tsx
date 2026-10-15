@@ -121,7 +121,7 @@ export function TreeItem({
         className={cx(
           'group relative flex h-8 items-center gap-1 rounded-md pr-1 text-sm transition-colors',
           INDENT[Math.min(depth, 3)],
-          selected ? 'bg-sidebar-active text-white' : 'text-ink-inverse/80 hover:bg-sidebar-hover hover:text-ink-inverse',
+          selected ? 'bg-sidebar-active text-white ring-1 ring-inset ring-brand-400/20' : 'text-ink-inverse/75 hover:bg-sidebar-hover hover:text-ink-inverse',
         )}
       >
         {selected && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-400" />}
@@ -162,7 +162,7 @@ export function TreeItem({
         >
           <Icon
             size={15}
-            className={cx('shrink-0', c.type === 'space' ? 'text-brand-300' : c.type === 'folder' ? 'text-amber-300/80' : 'text-ink-inverse/50', selected && 'text-white')}
+            className={cx('shrink-0', c.type === 'space' ? 'text-brand-300' : c.type === 'folder' ? 'text-amber-200/70' : 'text-ink-inverse/45', selected && 'text-brand-200')}
           />
           <span className={cx('truncate', c.type === 'space' && 'font-medium')}>{c.name}</span>
           {c.visibility === 'private' && <Lock size={11} className="shrink-0 text-ink-inverse/40" aria-label="Private" />}

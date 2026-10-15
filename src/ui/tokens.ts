@@ -1,4 +1,4 @@
-import type { Priority, StatusCategory, StatusColor, User } from '@/domain/types';
+import type { Priority, StatusCategory, StatusColor, TaskType, User } from '@/domain/types';
 
 /**
  * Semantic colour → Tailwind class maps. Full class strings are spelled out so Tailwind's JIT
@@ -22,6 +22,20 @@ export const PRIORITY_META: Record<Priority, { label: string; rank: number; badg
   normal: { label: 'Normal', rank: 2, badge: 'bg-sky-50 text-sky-700 ring-sky-200', icon: 'text-sky-500' },
   low: { label: 'Low', rank: 3, badge: 'bg-slate-100 text-slate-600 ring-slate-200', icon: 'text-slate-400' },
   none: { label: 'No priority', rank: 4, badge: 'bg-transparent text-ink-subtle ring-line', icon: 'text-ink-subtle' },
+};
+
+/** Jira-style issue types: solid coloured square + white glyph. */
+export const TYPE_META: Record<TaskType, { label: string; tile: string }> = {
+  task: { label: 'Task', tile: 'bg-sky-500' },
+  story: { label: 'Story', tile: 'bg-emerald-500' },
+  bug: { label: 'Bug', tile: 'bg-rose-500' },
+};
+
+/** Status button in the task header — solid, Jira-like, coloured by category. */
+export const CATEGORY_BUTTON: Record<StatusCategory, string> = {
+  todo: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+  in_progress: 'bg-blue-600 text-white hover:bg-blue-700',
+  done: 'bg-emerald-600 text-white hover:bg-emerald-700',
 };
 
 export const CATEGORY_LABEL: Record<StatusCategory, string> = {

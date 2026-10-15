@@ -40,8 +40,18 @@ export interface Status {
 export const PRIORITIES = ['urgent', 'high', 'normal', 'low', 'none'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
+export const TASK_TYPES = ['task', 'story', 'bug'] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+
 export interface Task {
   id: ID;
+  /** Workspace-wide sequence number; the visible key is `<LIST PREFIX>-<number>` (e.g. SPR-12). */
+  number: number;
+  type: TaskType;
+  /** Story-point estimate. */
+  points: number | null;
+  /** Lower-case, hyphenated tags. */
+  labels: string[];
   title: string;
   description: string;
   statusId: ID;
@@ -89,6 +99,16 @@ export interface ActivityEntry {
   at: ISODateString;
 }
 
+export interface Comment {
+  id: ID;
+  taskId: ID;
+  authorId: ID;
+  /** Plain text; `@First Last` mentions are highlighted when rendered. */
+  body: string;
+  createdAt: ISODateString;
+  editedAt: ISODateString | null;
+}
+
 export interface EntitiesState {
   containers: Record<ID, Container>;
   tasks: Record<ID, Task>;
@@ -96,6 +116,7 @@ export interface EntitiesState {
   users: Record<ID, User>;
   grants: Record<ID, Grant>;
   activity: ActivityEntry[];
+  comments: Record<ID, Comment>;
 }
 
 /** Valid child type for each container type. Lists hold tasks, not containers. */

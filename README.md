@@ -13,6 +13,54 @@ for the API and the database.
 
 ---
 
+## What's new: Jira-style redesign
+
+Task keys, a new task view, filters, list editing and undo.
+
+**Board and cards**
+- Task keys (e.g. `SPR-9`) from list name + a workspace-wide number, and task types (Task / Story / Bug) with icons
+- Jira-style cards: labels, story points, clickable priority flag, type and key footer
+- Column headers: colour strip, story-point total, "+" to add a task, collapse to a thin strip
+
+**Task view**
+- Centred two-column popup (full-screen on phones) with a status button and a Details panel (assignee, priority,
+  type, points, labels, due date, list)
+- Rich-text description editor (Tiptap, loaded on first open)
+- Comments with @mention autocomplete, edit/delete permissions, and a per-task History tab
+- `J`/`K` to step through tasks; `C`, `M` and `1`–`5` shortcuts; copy link
+
+**Filters and views**
+- Filter box, My tasks, avatar quick-filter, multi-select Status / Assignee / Priority / Labels / Due date dropdowns
+- Saved views per list (stored in the browser)
+
+**List view**
+- Inline status and priority editing, row checkboxes with bulk Status / Priority / Assign / Delete, Group by,
+  inline Create task
+
+**Navigation and layout**
+- `Cmd`/`Ctrl`+`K` command palette (lists, tasks by key or title, actions)
+- Collapsible sidebar (overlay on small screens), responsive top bar and header, cooler navy/indigo colour palette,
+  custom select chevron
+
+**List header and top bar**
+- Red "N overdue" badge next to the progress bar: counts tasks past their due date, ignores completed tasks, hidden
+  when nothing is overdue; hovering the percentage shows "x of y tasks done"
+- Redesigned "Viewing as" user switcher: taller (40px) button, larger avatar, evenly spaced two-line label and role
+  badge; on narrow screens it shrinks to avatar + role badge so the top bar never wraps
+
+**Safety**
+- Undo toasts for delete, column moves, complete/reopen and bulk edits; undo is refused if tasks changed since
+
+**Data**
+- Task gains `number`, `type`, `points`, `labels`; new `comments` collection
+- Persisted storage v1 → v2 migration keeps existing data
+- Descriptions stored as HTML; search and filters use plain text
+
+**Tests:** 68 passing (15 new) covering keys, validation, comments, undo, migration, filters, editor, command palette
+and bulk edit.
+
+---
+
 ## 1. Run locally
 
 Requires Node 18+ (developed on Node 22).
@@ -52,30 +100,30 @@ First E2E run: `npx playwright install chromium`. If you already have a Chromium
 flowchart LR
   subgraph UI["React components (presentational + thin containers)"]
     SB[Sidebar / TreeItem<br/>dnd-kit sortable]
-    TB[TopBar<br/>UserSwitcher · SearchBox · Activity]
-    LP[ListPage<br/>header · skeletons · empty / 403 states]
-    BV[BoardView<br/>dnd-kit multi-container]
-    LV[ListView<br/>sortable table]
-    DR[TaskDrawer / TaskDetail<br/>Headless UI Dialog]
+    TB[TopBar<br/>UserSwitcher · SearchBox · Activity · CommandPalette]
+    LP[ListPage<br/>header · filters · saved views · skeletons · empty / 403 states]
+    BV[BoardView<br/>dnd-kit multi-container · collapsible columns]
+    LV[ListView<br/>sortable · groupable · inline + bulk edit]
+    DR[TaskDrawer / TaskDetail<br/>Headless UI Dialog · Details panel · Activity]
     DL[Dialogs<br/>Container · Sharing · Statuses · Confirm]
     TS[Toaster]
   end
 
   subgraph Store["Client data layer"]
     SEL["selectors.ts<br/>permission-aware read models<br/>selectVisibleTree · selectListView · selectTaskDetail · selectSearch · selectActivity"]
-    APP["appStore.ts (Zustand + persist)<br/>entities + currentUserId<br/>every mutation → run(command)"]
-    UIS["uiStore.ts<br/>selected list · view · drawer · sort"]
+    APP["appStore.ts (Zustand + persist)<br/>entities + currentUserId<br/>every mutation → run(command) · snapshot / undo"]
+    UIS["uiStore.ts<br/>selected list · view · drawer · sort · filters · group by · saved views · sidebar"]
     TOS["toastStore.ts"]
   end
 
   subgraph Domain["Pure domain (no React, no Zustand)"]
-    CMD["commands/*<br/>containers · tasks · statuses · grants<br/>(ctx, args) → Result&lt;{patch, value}&gt;"]
+    CMD["commands/*<br/>containers · tasks · statuses · grants · comments<br/>(ctx, args) → Result&lt;{patch, value}&gt;"]
     PERM["permissions.ts<br/>canSeeContainer · requireContainer · requireAdmin"]
-    VAL["validation.ts · ordering.ts · tree.ts"]
+    VAL["validation.ts · ordering.ts · tree.ts · taskKey.ts · richText.ts"]
   end
 
   SEED[(seed.ts fixtures)] --> APP
-  LS[(localStorage<br/>flowboard:v1)] <--> APP
+  LS[(localStorage<br/>flowboard:v1, schema v2)] <--> APP
   UI -- "useSelector()" --> SEL --> PERM
   UI -- "store.createTask(...) etc." --> APP --> CMD --> PERM & VAL
   UI --> UIS & TOS
@@ -95,21 +143,22 @@ Three layers, each with a single job:
 
 ```
 src/
-  domain/            types · result · permissions · validation · ordering · tree · commands/*
-  data/seed.ts       fixtures
-  store/             appStore (entities + mutations) · selectors · uiStore · toastStore
+  domain/            types · result · permissions · validation · ordering · tree · taskKey · richText · commands/*
+  data/seed.ts       fixtures (incl. types, points, labels, sample comments)
+  store/             appStore (entities + mutations + undo) · selectors · uiStore · toastStore
   components/
-    sidebar/         Sidebar · TreeItem · ArchivedSection
-    board/           BoardView · TaskCard · QuickAdd
-    list/            ListView (+ pure sortTasks)
-    task/            TaskDrawer · TaskDetail · SubtaskList · NewTaskDialog
+    sidebar/         Sidebar (collapsible / mobile overlay) · TreeItem · ArchivedSection
+    board/           BoardView · TaskCard · QuickAdd · PriorityMenu
+    list/            ListView (+ pure sortTasks; grouping, inline + bulk edit, inline create)
+    task/            TaskDrawer · TaskDetail · Activity (comments + history) · fields (status button,
+                     labels, points, inline status) · SubtaskList · NewTaskDialog · taskActions (complete, undo)
     dialogs/         ContainerDialog · SharingDialog · StatusesDialog · dialogStore
-    layout/          TopBar · UserSwitcher · SearchBox
+    layout/          TopBar · UserSwitcher · SearchBox · CommandPalette
     activity/        ActivityPanel
-    main/            ListPage (header, skeletons, empty / 403 / 404 states)
-    ui/              primitives · overlays (Modal, Confirm, Toaster) · SelectMenu
-  ui/                tokens.ts (status/priority/avatar class maps) · icons.tsx
-  hooks/             useHashRoute (#/list/:id/task/:id deep links)
+    main/            ListPage (header, filters, skeletons, empty / 403 / 404 states) · FilterDropdown · SavedViews
+    ui/              primitives · overlays (Modal, Confirm, Toaster) · SelectMenu · RichTextEditor (Tiptap, lazy-loaded)
+  ui/                tokens.ts (status/priority/type/avatar class maps) · icons.tsx
+  hooks/             useHashRoute (#/list/:id/task/:id deep links) · useShortcut (single-key shortcuts)
 e2e/                 Playwright specs
 ```
 
@@ -123,10 +172,11 @@ All entities live in normalised `Record<id, Entity>` maps (`EntitiesState` in `s
 | ------------- | ------------------------------------------------------------------------------------------------------------ | ----- |
 | **Container** | `id, name, type, parentId, position, visibility, archivedAt, createdAt, updatedAt`                           | `type ∈ workspace \| space \| folder \| list`. One table for the whole tree. |
 | **Status**    | `id, listId, name, category, color, position`                                                                | `category ∈ todo \| in_progress \| done`. Each list owns its set. |
-| **Task**      | `id, title, description, statusId, priority, assigneeIds, dueDate, position, primaryListId, parentTaskId, version, createdAt, updatedAt` | `parentTaskId` → one level of subtasks. `version` → optimistic concurrency. |
+| **Task**      | `id, number, type, points, labels, title, description, statusId, priority, assigneeIds, dueDate, position, primaryListId, parentTaskId, version, createdAt, updatedAt` | `number` → key `<LIST PREFIX>-<number>` (e.g. `SPR-9`, unique workspace-wide). `type ∈ task \| story \| bug`. `description` is HTML from the editor. `parentTaskId` → one level of subtasks. `version` → optimistic concurrency. |
 | **User**      | `id, name, email, role, avatarColor`                                                                          | `role ∈ admin \| member` |
 | **Grant**     | `id, resourceId, userId, mode`                                                                               | `mode ∈ allow \| deny`; at most one per (resource, user). |
-| **Activity**  | `id, actorId, resourceId, taskId, message, at`                                                               | `resourceId` is used to permission-filter the feed. |
+| **Activity**  | `id, actorId, resourceId, taskId, message, at`                                                               | `resourceId` is used to permission-filter the feed. Also powers each task's History tab. |
+| **Comment**   | `id, taskId, authorId, body, createdAt, editedAt`                                                            | Plain text; `@First Last` mentions are highlighted. Deleted with their task. |
 
 ### Integrity rules (enforced in commands, covered by tests)
 
@@ -135,8 +185,11 @@ All entities live in normalised `Record<id, Entity>` maps (`EntitiesState` in `s
 - **Names:** trimmed, required, ≤ 80 chars, unique among non-archived siblings (case-insensitive) → `CONFLICT`.
 - **Ordering:** `position` is always contiguous `0..n-1` within a sibling group (containers), a `(list, status)`
   column (top-level tasks), or a parent (subtasks). Every move/insert/delete/archive renumbers.
-- **Tasks:** title required, ≤ 500 chars; status must belong to the task's list; priority from the enum;
-  due date must parse as ISO; **assignees must be able to see the list**.
+- **Tasks:** title required, ≤ 500 chars; status must belong to the task's list; priority and type from their enums;
+  due date must parse as ISO; **assignees must be able to see the list**; story points 0–999 with at most one decimal;
+  labels normalised to lower-case-hyphenated, ≤ 30 chars each, ≤ 10 per task. New tasks get the next workspace-wide number.
+- **Comments:** body required, ≤ 5,000 chars. Anyone who can see the task's list can comment; only the author can edit;
+  the author or an admin can delete.
 - **Subtasks:** parent must be a top-level task in the same list (max depth 1). Subtasks move with their parent
   and are deleted with it; they cannot be moved to another list on their own.
 - **Moving a task to another list:** status is mapped by category (in progress → first in-progress status of the
@@ -152,13 +205,19 @@ All entities live in normalised `Record<id, Entity>` maps (`EntitiesState` in `s
 - **Containers are soft-deleted (archived).** Only the archived node gets `archivedAt`; descendants are hidden
   implicitly (`isEffectivelyArchived` walks ancestors), so restoring a node brings back its whole subtree and tasks
   untouched. A child can't be restored while its parent is archived. Admins restore from **Archived** in the sidebar.
-- **Tasks are hard-deleted**, behind an inline confirmation in the drawer (subtasks: two-step inline confirm).
+- **Tasks are hard-deleted**, behind an inline confirmation in the drawer (subtasks: two-step inline confirm). The
+  toast offers **Undo** for a few seconds, which restores the task, its subtasks and comments from a snapshot — refused
+  if any task changed in the meantime, so undo never overwrites later work. Column moves, complete/reopen and bulk edits
+  are undoable the same way.
 
 ### Persistence (documented choice)
 
-Entities + current user persist to `localStorage` (`flowboard:v1`, versioned; unknown versions fall back to fresh seed).
-Opening a second tab works — writes in one tab re-hydrate the other. UI-only state (selected view, sort) is not persisted;
-the selected list/task lives in the URL hash so deep links and back/forward work.
+Entities + current user persist to `localStorage` under the key `flowboard:v1`, with a schema version (currently **2**).
+Version 1 data is migrated in place (`migrateV1`: tasks get numbers by creation order and default type/points/labels;
+an empty `comments` collection is added); unknown versions fall back to fresh seed. Opening a second tab works — writes
+in one tab re-hydrate the other. Per-browser preferences (Board/List view, Group by, sidebar collapsed, saved views) are
+kept under `flowboard:ui`; filters and sort reset when you switch lists. The selected list/task lives in the URL hash so
+deep links and back/forward work.
 
 ### Error shape
 
@@ -245,18 +304,18 @@ type Result<T> = { data: T } | { error: { code: 'FORBIDDEN' | 'NOT_FOUND' | 'VAL
 
 - Moving containers between parents (only sibling reorder). The command shape supports it; needs cycle checks + UI.
 - Pagination of the list view (optional) — in-memory data is tiny.
-- Responsive / mobile layout beyond "doesn't break" (desktop-first per the brief).
 - Workspace-level settings, user management, dark mode (out of scope).
-- Undo for task deletion (there's a confirmation instead).
+- Column task limits (WIP limits) and board swimlanes (List view has Group by instead).
+- Notifications for @mentions; comments and saved views are per-browser until there is a backend.
 
 **Week 2**
 
 1. Swap the store's command runner for an async API client (`fetch` → same `Result` shape) with React Query, keeping
    commands as server handlers; add real optimistic updates with rollback on 4xx.
 2. Team-based grants and resource roles (see above); an access-audit view ("why can Bob see this?").
-3. Cross-list moves via drag (drop a card on a sidebar list), multi-select + bulk status/assignee.
+3. Cross-list moves via drag (drop a card on a sidebar list); board swimlanes and WIP limits.
 4. Virtualised columns/rows for large lists; cursor pagination in the list view.
-5. Markdown description with preview; comments; due-date reminders.
+5. Mention notifications and an inbox; due-date reminders; server-side comments and saved views.
 6. Storybook for primitives; visual regression on the board.
 
 ---
@@ -290,7 +349,7 @@ popovers); none of that is authored here. Dynamic widths (e.g. the list progress
 
 ## Stretch goals attempted
 
-1. **Client-side search** on task title + description (top bar, `/` to focus) — across every list *you can see*, opens the task in place.
+1. **Client-side search** on task key, title + description (top bar, `/` to focus; or the `⌘K` command palette) — across every list *you can see*, opens the task in place.
 2. **Activity feed** ("Alice moved *X* to Done") — permission-filtered per viewer, click an entry to jump to the task.
 3. **Deployed preview** on Vercel (auto-deploys on every push to `main`).
 
@@ -304,7 +363,13 @@ Also within MVP-stretch: **one level of subtasks** (drawer checklist, `n/m` badg
   subtask depth; reordering & cross-column/cross-list moves with contiguous positions; hierarchy rules; duplicate names;
   archive/restore cascade; status deletion & reassignment.
 - `src/components/list/ListView.test.ts` — sort by priority/due date (no-date sinks), manual order.
-- `src/App.test.tsx` — integration: skeleton → tree → first list; Alice → Bob switch hides Marketing and shows 403; drawer opens/Escape closes; members see no admin controls.
+- `src/store/jiraFeatures.test.ts` — key prefixes and numbering, key search, points/labels validation, comment
+  permissions (author edit, admin delete, hidden lists), comments deleted with their task, undo + undo conflict, v1 → v2 migration.
+- `src/components/main/filterListView.test.ts` — filter semantics (OR within a field, AND across fields), status filter
+  narrows columns, due-date buckets.
+- `src/App.test.tsx` — integration: skeleton → tree → first list; Alice → Bob switch hides Marketing and shows 403; drawer
+  opens/Escape closes; members see no admin controls; card priority menu; J/K + priority + complete shortcuts; filters;
+  description editor save/cancel (and shortcuts don't fire while typing); comments; undo delete; `⌘K`; bulk edit + undo.
 - `e2e/*.spec.ts` (Playwright) — pointer drag across columns + persistence after reload; keyboard reorder; drawer Escape/overlay close + autosave;
   quick-add validation; list sorting; user switch; deep-link 403; revoking a grant live.
 

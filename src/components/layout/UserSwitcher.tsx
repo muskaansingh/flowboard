@@ -36,17 +36,17 @@ export function UserSwitcher() {
       <ListboxButton
         data-testid="user-switcher"
         className={cx(
-          'flex h-9 items-center gap-2 rounded-lg bg-surface pl-1.5 pr-2 text-left ring-1 ring-inset ring-line-strong transition-colors hover:bg-canvas data-[open]:ring-brand-500',
+          'flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-surface pl-1.5 pr-3 text-left lg:gap-2.5 ring-1 ring-inset ring-line-strong transition-colors hover:bg-canvas data-[open]:ring-brand-500',
           focusRing,
         )}
       >
-        <Avatar user={current} size="sm" />
-        <span className="hidden flex-col leading-none sm:flex">
+        <Avatar user={current} size="md" />
+        <span className="hidden flex-col gap-1 leading-none lg:flex">
           <span className="text-[10px] font-medium uppercase tracking-wide text-ink-subtle">Viewing as</span>
-          <span className="mt-0.5 text-sm font-semibold text-ink">{current.name}</span>
+          <span className="text-[13px] font-semibold text-ink">{current.name}</span>
         </span>
         <RoleBadge user={current} />
-        <ChevronUpDown size={14} className="text-ink-subtle" />
+        <ChevronUpDown size={14} className="shrink-0 text-ink-subtle lg:-ml-1" />
       </ListboxButton>
       <ListboxOptions
         anchor="bottom end"
